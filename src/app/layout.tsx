@@ -3,17 +3,27 @@ import type { Metadata } from 'next'
 // @ts-ignore
 import './globals.css'
 import { ClerkProvider } from "@clerk/nextjs";
+import SyncUser from '@/components/SyncUser'
+
+export const metadata: Metadata = {
+  title: 'TalentStage — Creator & Freelancer Marketplace',
+  description: 'Where creative and technical freelancers get discovered.',
+}
 
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode;
+  children: React.ReactNode
 }>) {
   return (
     <ClerkProvider>
       <html lang="en" suppressHydrationWarning>
-        <body>{children}</body>
+        <body>
+          <div className="ambient-glow" />
+          <SyncUser />
+          {children}
+        </body>
       </html>
     </ClerkProvider>
-  );
+  )
 }
