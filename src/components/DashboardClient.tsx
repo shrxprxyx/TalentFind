@@ -167,7 +167,7 @@ export default function DashboardClient({ userName, userImage, userEmail }: Prop
 
           {/* AI Feature teaser */}
           <motion.div variants={item}>
-            <Card className="bg-gradient-to-br from-amber-500/8 to-transparent border-amber-500/20 overflow-hidden relative">
+            <Card className="bg-linear-to-br from-amber-500/8 to-transparent border-amber-500/20 overflow-hidden relative">
               <div className="absolute top-0 right-0 w-48 h-48 bg-amber-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />
               <CardContent className="p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 relative z-10">
                 <div className="flex items-start gap-4">

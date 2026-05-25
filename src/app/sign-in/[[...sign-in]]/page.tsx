@@ -6,7 +6,6 @@ import { motion } from 'framer-motion'
 export default function Page() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6 relative">
-      {/* Grid bg */}
       <div
         className="absolute inset-0 opacity-[0.025]"
         style={{
@@ -25,6 +24,7 @@ export default function Page() {
           TalentStage
         </a>
         <SignIn
+          forceRedirectUrl="/dashboard"
           appearance={{
             variables: {
               colorPrimary: 'hsl(40, 85%, 58%)',

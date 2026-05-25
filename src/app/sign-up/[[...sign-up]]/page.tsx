@@ -24,6 +24,7 @@ export default function Page() {
           TalentStage
         </a>
         <SignUp
+          forceRedirectUrl="/dashboard"
           appearance={{
             variables: {
               colorPrimary: 'hsl(40, 85%, 58%)',
