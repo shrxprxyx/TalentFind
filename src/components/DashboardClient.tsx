@@ -51,9 +51,9 @@ const quickActions = [
 ];
 
 const ROLES = [
-  { key: "FREELANCER", label: "Freelancer", desc: "I offer services" },
-  { key: "CLIENT", label: "Client", desc: "I hire talent" },
-  { key: "BOTH", label: "Both", desc: "I do both" },
+  { key: "FREELANCER", label: "Freelancer"},
+  { key: "CLIENT", label: "Client"},
+  { key: "BOTH", label: "Both"},
 ] as const;
 
 function StatCard({
@@ -183,16 +183,15 @@ export default function DashboardClient({ userName, userImage, userEmail }: Prop
                     Tell us how you'll use TalentStage so we can personalise your experience.
                   </p>
                   <div className="grid grid-cols-3 gap-3">
-                    {ROLES.map(({ key, label, desc }) => (
+                    {ROLES.map(({ key, label}) => (
                       <button
                         key={key}
                         onClick={() => updateRole(key)}
-                        className="group flex flex-col items-start gap-1 p-4 rounded-xl border border-border hover:border-amber-500/50 hover:bg-amber-500/5 transition-all duration-200 text-left"
+                        className="group flex flex-col cursor-pointer items-start gap-1 p-4 rounded-xl border border-border hover:border-amber-500/50 hover:bg-amber-500/5 transition-all duration-200 text-left"
                       >
-                        <span className="font-semibold text-sm group-hover:text-amber-400 transition-colors">
+                        <span className="font-semibold  text-sm group-hover:text-amber-400 transition-colors">
                           {label}
                         </span>
-                        <span className="text-xs text-muted-foreground">{desc}</span>
                       </button>
                     ))}
                   </div>
@@ -210,7 +209,7 @@ export default function DashboardClient({ userName, userImage, userEmail }: Prop
                 <span className="font-semibold capitalize">{role.toLowerCase()}</span>.
                 <button
                   onClick={() => {/* open role change UI */}}
-                  className="text-muted-foreground hover:text-amber-400 underline underline-offset-2 ml-1 transition-colors"
+                  className="text-muted-foreground cursor-pointer hover:text-amber-400 underline underline-offset-2 ml-1 transition-colors"
                 >
                   Change
                 </button>
@@ -230,8 +229,8 @@ export default function DashboardClient({ userName, userImage, userEmail }: Prop
                     variant={accent ? "default" : "outline"}
                     className={`w-full h-auto py-4 flex flex-col items-center gap-2 rounded-xl transition-all duration-300 ${
                       accent
-                        ? "bg-amber-500 hover:bg-amber-400 text-slate-950 hover:shadow-[0_0_20px_hsla(40,85%,58%,0.35)]"
-                        : "border-border hover:border-amber-500/40 hover:bg-secondary"
+                        ? "bg-amber-500 cursor-pointer hover:bg-amber-400 text-slate-950 hover:shadow-[0_0_20px_hsla(40,85%,58%,0.35)]"
+                        : "border-border cursor-pointer hover:border-amber-500/40 hover:bg-secondary"
                     }`}
                   >
                     <Icon className="w-5 h-5" />
