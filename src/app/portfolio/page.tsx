@@ -50,7 +50,7 @@ const emptyForm = {
 };
 
 export default function PortfolioPage() {
-  const { getToken } = useAuth();
+  const { getToken, isLoaded, isSignedIn } = useAuth();
   const [items, setItems] = useState<PortfolioItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -76,7 +76,10 @@ export default function PortfolioPage() {
     }
   };
 
-  useEffect(() => { fetchPortfolio(); }, []);
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+    fetchPortfolio();
+  }, [isLoaded, isSignedIn]);
 
   const addTech = () => {
     const t = techInput.trim();
@@ -147,7 +150,7 @@ export default function PortfolioPage() {
             </div>
             <Button
               onClick={() => { setShowForm(true); setError(""); }}
-              className="bg-amber-500 hover:bg-amber-400 cursor-pointer text-slate-950 font-semibold rounded-full gap-2 hover:shadow-[0_0_20px_hsla(40,85%,58%,0.35)] transition-all duration-300"
+              className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold rounded-full gap-2 hover:shadow-[0_0_20px_hsla(40,85%,58%,0.35)] transition-all duration-300"
             >
               <Plus className="w-4 h-4" /> Add Project
             </Button>
@@ -176,7 +179,7 @@ export default function PortfolioPage() {
                       </h2>
                       <button
                         onClick={() => { setShowForm(false); setForm(emptyForm); }}
-                        className="text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
+                        className="text-muted-foreground hover:text-foreground transition-colors"
                       >
                         <X className="w-4 h-4" />
                       </button>
@@ -245,7 +248,7 @@ export default function PortfolioPage() {
                           onChange={(e) => setTechInput(e.target.value)}
                           onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTech())}
                         />
-                        <Button size="sm" variant="outline" onClick={addTech} className="border-border cursor-pointer hover:border-amber-500/40">
+                        <Button size="sm" variant="outline" onClick={addTech} className="border-border hover:border-amber-500/40">
                           <Plus className="w-4 h-4" />
                         </Button>
                       </div>
@@ -255,7 +258,7 @@ export default function PortfolioPage() {
                             <Badge key={t} variant="outline" className="border-amber-500/30 text-amber-400 bg-amber-500/5 gap-1 pr-1 text-xs">
                               {t}
                               <button onClick={() => setForm({ ...form, techStack: form.techStack.filter((x) => x !== t) })}>
-                                <X className="w-3 h-3 cursor-pointer" />
+                                <X className="w-3 h-3" />
                               </button>
                             </Badge>
                           ))}
@@ -264,13 +267,13 @@ export default function PortfolioPage() {
                     </div>
 
                     <div className="flex justify-end gap-2">
-                      <Button variant="ghost" onClick={() => { setShowForm(false); setForm(emptyForm); }} className="text-muted-foreground cursor-pointer">
+                      <Button variant="ghost" onClick={() => { setShowForm(false); setForm(emptyForm); }} className="text-muted-foreground">
                         Cancel
                       </Button>
                       <Button
                         onClick={handleSave}
                         disabled={saving}
-                        className="bg-amber-500 cursor-pointer hover:bg-amber-400 text-slate-950 font-semibold rounded-full px-6"
+                        className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold rounded-full px-6"
                       >
                         {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</> : "Save Project"}
                       </Button>
@@ -293,7 +296,7 @@ export default function PortfolioPage() {
               <Button
                 size="sm"
                 onClick={() => setShowForm(true)}
-                className="mt-4 bg-amber-500 cursor-pointer hover:bg-amber-400 text-slate-950 rounded-full"
+                className="mt-4 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-full"
               >
                 Add your first project
               </Button>
@@ -331,7 +334,7 @@ export default function PortfolioPage() {
                         <button
                           onClick={() => handleDelete(portfolioItem.id)}
                           disabled={deletingId === portfolioItem.id}
-                          className="text-muted-foreground cursor-pointer hover:text-red-400 transition-colors shrink-0"
+                          className="text-muted-foreground hover:text-red-400 transition-colors shrink-0"
                         >
                           {deletingId === portfolioItem.id ? (
                             <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -353,14 +356,14 @@ export default function PortfolioPage() {
                       <div className="flex gap-2 mt-auto">
                         {portfolioItem.githubUrl && (
                           <a href={portfolioItem.githubUrl} target="_blank" rel="noopener noreferrer">
-                            <Button size="sm" variant="ghost" className="text-xs text-muted-foreground cursor-pointer hover:text-foreground h-7 px-2 gap-1">
+                            <Button size="sm" variant="ghost" className="text-xs text-muted-foreground hover:text-foreground h-7 px-2 gap-1">
                               <Code className="w-3.5 h-3.5" /> Code
                             </Button>
                           </a>
                         )}
                         {portfolioItem.liveUrl && (
                           <a href={portfolioItem.liveUrl} target="_blank" rel="noopener noreferrer">
-                            <Button size="sm" variant="ghost" className="text-xs text-muted-foreground cursor-pointer hover:text-amber-400 h-7 px-2 gap-1">
+                            <Button size="sm" variant="ghost" className="text-xs text-muted-foreground hover:text-amber-400 h-7 px-2 gap-1">
                               <ExternalLink className="w-3.5 h-3.5" /> Live
                             </Button>
                           </a>

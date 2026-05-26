@@ -49,7 +49,7 @@ const item: Variants = {
 };
 
 export default function MyProposalsPage() {
-  const { getToken } = useAuth();
+  const { getToken, isLoaded, isSignedIn } = useAuth();
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -72,7 +72,10 @@ export default function MyProposalsPage() {
     }
   };
 
-  useEffect(() => { fetchProposals(); }, []);
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+    fetchProposals();
+  }, [isLoaded, isSignedIn]);
 
   const handleWithdraw = async (id: string) => {
     try {

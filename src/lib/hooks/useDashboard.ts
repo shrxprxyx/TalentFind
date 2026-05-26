@@ -46,7 +46,7 @@ export interface DashboardData {
 }
 
 export function useDashboard() {
-  const { getToken } = useAuth()
+  const { getToken, isLoaded, isSignedIn } = useAuth()
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -68,8 +68,9 @@ export function useDashboard() {
   }
 
   useEffect(() => {
+    if (!isLoaded || !isSignedIn) return
     fetchDashboard()
-  }, [])
+  }, [isLoaded, isSignedIn])
 
   const updateRole = async (role: 'FREELANCER' | 'CLIENT' | 'BOTH') => {
     try {
@@ -79,7 +80,7 @@ export function useDashboard() {
         { role },
         { headers: { Authorization: token! } }
       )
-      await fetchDashboard() // refresh after role update
+      await fetchDashboard()
     } catch (err) {
       setError('Failed to update role')
     }
