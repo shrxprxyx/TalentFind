@@ -43,11 +43,11 @@ const item: Variants = {
   },
 };
 
-const quickActions = [
-  { label: "Post a Project", href: "/projects/new", icon: Plus, accent: true },
-  { label: "Browse Projects", href: "/projects", icon: Briefcase, accent: false },
-  { label: "My Portfolio", href: "/portfolio", icon: Star, accent: false },
-  { label: "My Proposals", href: "/proposals", icon: FileText, accent: false },
+const allQuickActions = [
+  { label: "Post a Project", href: "/projects/new", icon: Plus, accent: true, roles: ["CLIENT", "BOTH"] },
+  { label: "Browse Projects", href: "/projects", icon: Briefcase, accent: false, roles: ["FREELANCER", "CLIENT", "BOTH"] },
+  { label: "My Portfolio", href: "/portfolio", icon: Star, accent: false, roles: ["FREELANCER", "BOTH"] },
+  { label: "My Proposals", href: "/proposals", icon: FileText, accent: false, roles: ["FREELANCER", "BOTH"] },
 ];
 
 const ROLES = [
@@ -99,6 +99,10 @@ export default function DashboardClient({ userName, userImage, userEmail }: Prop
   const stats = data?.stats;
   const recentProposals = data?.recentProposals ?? [];
   const recentProjects = data?.recentProjects ?? [];
+
+  const quickActions = role
+    ? allQuickActions.filter((a) => a.roles.includes(role))
+    : allQuickActions.filter((a) => a.roles.includes("FREELANCER"));
 
   return (
     <div className="min-h-screen relative">
