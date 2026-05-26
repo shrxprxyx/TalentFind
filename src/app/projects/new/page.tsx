@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import { motion } from "framer-motion";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Navbar from "@/components/Navbar";
+import { useDashboard } from "@/lib/hooks/useDashboard";
 import axios from "axios";
 import { X, Plus, Loader2, ArrowLeft } from "lucide-react";
 import Link from "next/link";
@@ -20,6 +21,14 @@ const item = {
 export default function NewProjectPage() {
   const router = useRouter();
   const { getToken } = useAuth();
+  const { data } = useDashboard();
+
+  // Redirect freelancers away
+  useEffect(() => {
+    if (data?.user?.role === "FREELANCER") {
+      router.replace("/projects");
+    }
+  }, [data?.user?.role]);
 
   const [form, setForm] = useState({
     title: "",
@@ -78,7 +87,7 @@ export default function NewProjectPage() {
           {/* Header */}
           <motion.div variants={item} className="flex flex-col gap-2">
             <Link href="/dashboard">
-              <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground w-fit -ml-2 mb-2">
+              <Button variant="ghost" size="sm" className="text-muted-foreground cursor-pointer hover:text-foreground w-fit -ml-2 mb-2">
                 <ArrowLeft className="w-4 h-4 mr-1" /> Back
               </Button>
             </Link>
@@ -146,8 +155,8 @@ export default function NewProjectPage() {
                           onClick={() => setForm({ ...form, projectType: type })}
                           className={`flex-1 py-2 rounded-lg text-xs font-medium border transition-all duration-200 ${
                             form.projectType === type
-                              ? "bg-amber-500/10 border-amber-500/50 text-amber-400"
-                              : "border-border text-muted-foreground hover:border-amber-500/30"
+                              ? "bg-amber-500/10 cursor-pointer border-amber-500/50 text-amber-400"
+                              : "border-border cursor-pointer text-muted-foreground hover:border-amber-500/30"
                           }`}
                         >
                           {type}
@@ -183,7 +192,7 @@ export default function NewProjectPage() {
                       size="sm"
                       variant="outline"
                       onClick={addSkill}
-                      className="border-border hover:border-amber-500/40 hover:text-amber-400"
+                      className="border-border cursor-pointer hover:border-amber-500/40 hover:text-amber-400"
                     >
                       <Plus className="w-4 h-4" />
                     </Button>
@@ -197,7 +206,7 @@ export default function NewProjectPage() {
                           className="border-amber-500/30 text-amber-400 bg-amber-500/5 gap-1 pr-1"
                         >
                           {s}
-                          <button onClick={() => removeSkill(s)} className="hover:text-red-400 transition-colors">
+                          <button onClick={() => removeSkill(s)} className="hover:text-red-400 cursor-pointer transition-colors">
                             <X className="w-3 h-3" />
                           </button>
                         </Badge>
@@ -213,7 +222,7 @@ export default function NewProjectPage() {
             <Button
               onClick={handleSubmit}
               disabled={loading}
-              className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold px-8 rounded-full transition-all duration-300 hover:shadow-[0_0_24px_hsla(40,85%,58%,0.4)]"
+              className="bg-amber-500 hover:bg-amber-400 cursor-pointer text-slate-950 font-semibold px-8 rounded-full transition-all duration-300 hover:shadow-[0_0_24px_hsla(40,85%,58%,0.4)]"
             >
               {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Posting...</> : "Post Project"}
             </Button>

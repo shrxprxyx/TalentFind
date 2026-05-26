@@ -1,7 +1,7 @@
 'use client'
 
 import { useAuth } from '@clerk/nextjs'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import axios from 'axios'
 
 export interface DashboardStats {
@@ -45,30 +45,60 @@ export interface DashboardData {
   recentProjects: RecentProject[]
 }
 
+// Module-level cache — shared across all useDashboard instances
+let cachedData: DashboardData | null = null
+let isFetching = false
+const listeners: Array<(data: DashboardData) => void> = []
+
 export function useDashboard() {
   const { getToken, isLoaded, isSignedIn } = useAuth()
-  const [data, setData] = useState<DashboardData | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [data, setData] = useState<DashboardData | null>(cachedData)
+  const [loading, setLoading] = useState(!cachedData)
   const [error, setError] = useState<string | null>(null)
 
   const fetchDashboard = async () => {
+    // If already fetching, subscribe to result
+    if (isFetching) {
+      listeners.push((d) => {
+        setData(d)
+        setLoading(false)
+      })
+      return
+    }
+
     try {
+      isFetching = true
       setLoading(true)
       const token = await getToken()
       const res = await axios.get(
         `${process.env.NEXT_PUBLIC_API_URL}/api/users/dashboard-stats`,
         { headers: { Authorization: token! } }
       )
+      cachedData = res.data
       setData(res.data)
+      // Notify all waiting listeners
+      listeners.forEach((fn) => fn(res.data))
+      listeners.length = 0
     } catch (err) {
       setError('Failed to load dashboard data')
     } finally {
+      isFetching = false
       setLoading(false)
     }
   }
 
+  const refetch = async () => {
+    cachedData = null // clear cache on manual refetch
+    await fetchDashboard()
+  }
+
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return
+    if (cachedData) {
+      setData(cachedData)
+      setLoading(false)
+      return
+    }
     fetchDashboard()
   }, [isLoaded, isSignedIn])
 
@@ -80,11 +110,12 @@ export function useDashboard() {
         { role },
         { headers: { Authorization: token! } }
       )
+      cachedData = null
       await fetchDashboard()
     } catch (err) {
       setError('Failed to update role')
     }
   }
 
-  return { data, loading, error, updateRole, refetch: fetchDashboard }
+  return { data, loading, error, updateRole, refetch }
 }

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import Navbar from "@/components/Navbar";
+import { useDashboard } from "@/lib/hooks/useDashboard";
 import axios from "axios";
 import {
   Search,
@@ -20,6 +21,7 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 
 interface Project {
@@ -47,6 +49,10 @@ const item: Variants = {
 
 export default function BrowseProjectsPage() {
   const { getToken } = useAuth();
+  const router = useRouter();
+  const { data } = useDashboard();
+  const role = data?.user?.role;
+  const canPost = role === "CLIENT" || role === "BOTH";
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -126,7 +132,7 @@ export default function BrowseProjectsPage() {
               </div>
               <Button
                 type="submit"
-                className="bg-amber-500 cursor-pointer hover:bg-amber-400 text-slate-950 font-semibold rounded-xl px-5"
+                className="bg-amber-500 hover:bg-amber-400 cursor-pointer text-slate-950 font-semibold rounded-xl px-5"
               >
                 Search
               </Button>
@@ -134,7 +140,7 @@ export default function BrowseProjectsPage() {
                 type="button"
                 variant="outline"
                 onClick={() => setShowFilters(!showFilters)}
-                className={`rounded-xl border-border cursor-pointer hover:border-amber-500/40 gap-2 ${showFilters ? "border-amber-500/40 text-amber-400" : ""}`}
+                className={`rounded-xl border-border hover:border-amber-500/40 gap-2 cursor-pointer ${showFilters ? "border-amber-500/40 text-amber-400" : ""}`}
               >
                 <SlidersHorizontal className="w-4 h-4" />
                 Filters
@@ -157,8 +163,8 @@ export default function BrowseProjectsPage() {
                         onClick={() => setTypeFilter(t)}
                         className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all duration-200 ${
                           typeFilter === t
-                            ? "bg-amber-500/10 cursor-pointer border-amber-500/50 text-amber-400"
-                            : "border-border cursor-pointer text-muted-foreground hover:border-amber-500/30"
+                            ? "bg-amber-500/10 border-amber-500/50 text-amber-400 cursor-pointer"
+                            : "border-border text-muted-foreground hover:border-amber-500/30 cursor-pointer"
                         }`}
                       >
                         {t === "" ? "All" : t}
@@ -192,9 +198,9 @@ export default function BrowseProjectsPage() {
                 {hasFilters && (
                   <button
                     onClick={clearFilters}
-                    className="text-xs text-muted-foreground cursor-pointer hover:text-red-400 flex items-center gap-1 transition-colors self-end pb-0.5"
+                    className="text-xs text-muted-foreground hover:text-red-400 cursor-pointer flex items-center gap-1 transition-colors self-end pb-0.5"
                   >
-                    <X className="w-3 h-3 " /> Clear all
+                    <X className="w-3 h-3" /> Clear all
                   </button>
                 )}
               </motion.div>
@@ -206,13 +212,17 @@ export default function BrowseProjectsPage() {
                 {search && (
                   <Badge variant="outline" className="border-amber-500/30 text-amber-400 bg-amber-500/5 gap-1 pr-1 text-xs">
                     "{search}"
-                    <button onClick={() => { setSearch(""); fetchProjects(); }}><X className="w-3 h-3" /></button>
+                    <button onClick={() => { setSearch(""); fetchProjects(); }} className="cursor-pointer">
+                      <X className="w-3 h-3" />
+                    </button>
                   </Badge>
                 )}
                 {typeFilter && (
                   <Badge variant="outline" className="border-amber-500/30 text-amber-400 bg-amber-500/5 gap-1 pr-1 text-xs">
                     {typeFilter}
-                    <button onClick={() => setTypeFilter("")}><X className="w-3 h-3" /></button>
+                    <button onClick={() => setTypeFilter("")} className="cursor-pointer">
+                      <X className="w-3 h-3" />
+                    </button>
                   </Badge>
                 )}
               </div>
@@ -235,79 +245,63 @@ export default function BrowseProjectsPage() {
             <motion.div variants={item} className="text-center py-20">
               <Briefcase className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
               <p className="text-muted-foreground">No projects found.</p>
-              <Link href="/projects/new">
-                <Button size="sm" className="mt-4 cursor-pointer bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-full">
-                  Post the first one
-                </Button>
-              </Link>
+              {canPost && (
+                <Link href="/projects/new">
+                  <Button size="sm" className="mt-4 bg-amber-500 cursor-pointer hover:bg-amber-400 text-slate-950 rounded-full">
+                    Post the first one
+                  </Button>
+                </Link>
+              )}
             </motion.div>
           ) : (
-            <motion.div variants={container} initial="hidden" animate="show" className="flex flex-col gap-4">
+            <div className="flex flex-col gap-4">
               {projects.map((project) => (
-                <motion.div key={project.id} variants={item}>
-                  <Link href={`/projects/${project.id}`}>
-                    <Card className="bg-card border-border/60 hover:border-amber-500/25 transition-all duration-300 hover:shadow-[0_0_20px_hsla(40,85%,58%,0.06)] group cursor-pointer">
-                      <CardContent className="p-6">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex flex-col gap-3 flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h3
-                                className="font-semibold text-lg group-hover:text-amber-400 transition-colors"
-                                style={{ fontFamily: "'Playfair Display', serif" }}
-                              >
-                                {project.title}
-                              </h3>
-                              <Badge
-                                variant="outline"
-                                className="text-xs border-border text-muted-foreground"
-                              >
-                                {project.projectType}
-                              </Badge>
-                            </div>
-                            <p className="text-sm text-muted-foreground line-clamp-2">
-                              {project.description}
-                            </p>
-                            {project.skills.length > 0 && (
-                              <div className="flex flex-wrap gap-1.5">
-                                {project.skills.slice(0, 5).map((s) => (
-                                  <Badge
-                                    key={s}
-                                    variant="outline"
-                                    className="text-xs border-amber-500/20 text-amber-400/70 bg-amber-500/5"
-                                  >
-                                    {s}
-                                  </Badge>
-                                ))}
-                                {project.skills.length > 5 && (
-                                  <span className="text-xs text-muted-foreground">+{project.skills.length - 5}</span>
-                                )}
-                              </div>
-                            )}
-                            <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
-                              <span className="flex items-center gap-1">
-                                <DollarSign className="w-3 h-3" />
-                                ${project.budget.toLocaleString()}
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                Due {formatDistanceToNow(new Date(project.deadline), { addSuffix: true })}
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <Users className="w-3 h-3" />
-                                {project.proposals.length} proposal{project.proposals.length !== 1 ? "s" : ""}
-                              </span>
-                              <span>by {project.client.name}</span>
-                              <span>posted {formatDistanceToNow(new Date(project.createdAt), { addSuffix: true })}</span>
-                            </div>
-                          </div>
-                          <ArrowRight className="w-5 h-5 text-muted-foreground group-hover:text-amber-400 group-hover:translate-x-1 transition-all duration-300 shrink-0 mt-1" />
+                <div
+                  key={project.id}
+                  onClick={() => router.push(`/projects/${project.id}`)}
+                  className="bg-card border border-border/60 hover:border-amber-500/25 transition-all duration-300 hover:shadow-[0_0_20px_hsla(40,85%,58%,0.06)] rounded-xl cursor-pointer group"
+                >
+                  <div className="p-6">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex flex-col gap-3 flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3
+                            className="font-semibold text-lg group-hover:text-amber-400 transition-colors"
+                            style={{ fontFamily: "'Playfair Display', serif" }}
+                          >
+                            {project.title}
+                          </h3>
+                          <Badge variant="outline" className="text-xs border-border text-muted-foreground">
+                            {project.projectType}
+                          </Badge>
                         </div>
-                      </CardContent>
-                    </Card>
-                  </Link>
-                </motion.div>
+                        <p className="text-sm text-muted-foreground line-clamp-2">{project.description}</p>
+                        {project.skills.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {project.skills.slice(0, 5).map((s) => (
+                              <Badge key={s} variant="outline" className="text-xs border-amber-500/20 text-amber-400/70 bg-amber-500/5">
+                                {s}
+                              </Badge>
+                            ))}
+                            {project.skills.length > 5 && (
+                              <span className="text-xs text-muted-foreground">+{project.skills.length - 5}</span>
+                            )}
+                          </div>
+                        )}
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
+                          <span className="flex items-center gap-1"><DollarSign className="w-3 h-3" />${project.budget.toLocaleString()}</span>
+                          <span className="flex items-center gap-1"><Clock className="w-3 h-3" />Due {formatDistanceToNow(new Date(project.deadline), { addSuffix: true })}</span>
+                          <span className="flex items-center gap-1"><Users className="w-3 h-3" />{project.proposals.length} proposal{project.proposals.length !== 1 ? "s" : ""}</span>
+                          <span>by {project.client.name}</span>
+                          <span>posted {formatDistanceToNow(new Date(project.createdAt), { addSuffix: true })}</span>
+                        </div>
+                      </div>
+                      <ArrowRight className="w-5 h-5 text-muted-foreground group-hover:text-amber-400 group-hover:translate-x-1 transition-all duration-300 shrink-0 mt-1" />
+                    </div>
+                  </div>
+                </div>
               ))}
-            </motion.div>
+            </div>
           )}
         </motion.div>
       </main>

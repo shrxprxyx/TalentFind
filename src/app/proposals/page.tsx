@@ -18,6 +18,9 @@ import {
   ArrowRight,
   Trash2,
   AlertCircle,
+  CheckCircle2,
+  XCircle,
+  Timer,
 } from "lucide-react";
 import Link from "next/link";
 import { formatDistanceToNow, format } from "date-fns";
@@ -27,6 +30,7 @@ interface Proposal {
   bidAmount: number;
   timeline: string;
   coverLetter: string;
+  status: "PENDING" | "ACCEPTED" | "REJECTED";
   createdAt: string;
   project: {
     id: string;
@@ -48,6 +52,28 @@ const item: Variants = {
   show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] as const } },
 };
 
+function StatusBadge({ status }: { status: Proposal["status"] }) {
+  if (status === "ACCEPTED") {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+        <CheckCircle2 className="w-3 h-3" /> Accepted
+      </span>
+    );
+  }
+  if (status === "REJECTED") {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-red-500/10 text-red-400 border border-red-500/20">
+        <XCircle className="w-3 h-3" /> Rejected
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+      <Timer className="w-3 h-3" /> Pending
+    </span>
+  );
+}
+
 export default function MyProposalsPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const [proposals, setProposals] = useState<Proposal[]>([]);
@@ -55,6 +81,7 @@ export default function MyProposalsPage() {
   const [error, setError] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [filterStatus, setFilterStatus] = useState<"" | "PENDING" | "ACCEPTED" | "REJECTED">("");
 
   const fetchProposals = async () => {
     try {
@@ -93,6 +120,12 @@ export default function MyProposalsPage() {
     }
   };
 
+  const filtered = filterStatus ? proposals.filter((p) => p.status === filterStatus) : proposals;
+
+  const accepted = proposals.filter((p) => p.status === "ACCEPTED").length;
+  const rejected = proposals.filter((p) => p.status === "REJECTED").length;
+  const pending = proposals.filter((p) => p.status === "PENDING").length;
+
   return (
     <div className="min-h-screen">
       <Navbar />
@@ -119,7 +152,7 @@ export default function MyProposalsPage() {
 
           {/* Stats strip */}
           {!loading && proposals.length > 0 && (
-            <motion.div variants={item} className="flex gap-6 text-sm">
+            <motion.div variants={item} className="flex gap-6 text-sm flex-wrap">
               <div className="flex flex-col gap-0.5">
                 <span className="text-2xl font-bold text-amber-400" style={{ fontFamily: "'Playfair Display', serif" }}>
                   {proposals.length}
@@ -128,18 +161,54 @@ export default function MyProposalsPage() {
               </div>
               <div className="w-px bg-border" />
               <div className="flex flex-col gap-0.5">
+                <span className="text-2xl font-bold text-emerald-400" style={{ fontFamily: "'Playfair Display', serif" }}>
+                  {accepted}
+                </span>
+                <span className="text-xs text-muted-foreground uppercase tracking-wider">Accepted</span>
+              </div>
+              <div className="w-px bg-border" />
+              <div className="flex flex-col gap-0.5">
+                <span className="text-2xl font-bold text-amber-400" style={{ fontFamily: "'Playfair Display', serif" }}>
+                  {pending}
+                </span>
+                <span className="text-xs text-muted-foreground uppercase tracking-wider">Pending</span>
+              </div>
+              <div className="w-px bg-border" />
+              <div className="flex flex-col gap-0.5">
+                <span className="text-2xl font-bold text-red-400" style={{ fontFamily: "'Playfair Display', serif" }}>
+                  {rejected}
+                </span>
+                <span className="text-xs text-muted-foreground uppercase tracking-wider">Rejected</span>
+              </div>
+              <div className="w-px bg-border" />
+              <div className="flex flex-col gap-0.5">
                 <span className="text-2xl font-bold" style={{ fontFamily: "'Playfair Display', serif" }}>
                   ${Math.round(proposals.reduce((acc, p) => acc + p.bidAmount, 0) / proposals.length).toLocaleString()}
                 </span>
                 <span className="text-xs text-muted-foreground uppercase tracking-wider">Avg Bid</span>
               </div>
-              <div className="w-px bg-border" />
-              <div className="flex flex-col gap-0.5">
-                <span className="text-2xl font-bold" style={{ fontFamily: "'Playfair Display', serif" }}>
-                  ${proposals.reduce((acc, p) => acc + p.bidAmount, 0).toLocaleString()}
-                </span>
-                <span className="text-xs text-muted-foreground uppercase tracking-wider">Total Bid Value</span>
-              </div>
+            </motion.div>
+          )}
+
+          {/* Status filter tabs */}
+          {!loading && proposals.length > 0 && (
+            <motion.div variants={item} className="flex gap-2 flex-wrap">
+              {(["", "PENDING", "ACCEPTED", "REJECTED"] as const).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setFilterStatus(s)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all duration-200 cursor-pointer ${
+                    filterStatus === s
+                      ? "bg-amber-500/10 border-amber-500/50 text-amber-400"
+                      : "border-border text-muted-foreground hover:border-amber-500/30"
+                  }`}
+                >
+                  {s === "" ? "All" : s.charAt(0) + s.slice(1).toLowerCase()}
+                  <span className="ml-1.5 text-muted-foreground">
+                    {s === "" ? proposals.length : proposals.filter((p) => p.status === s).length}
+                  </span>
+                </button>
+              ))}
             </motion.div>
           )}
 
@@ -153,16 +222,26 @@ export default function MyProposalsPage() {
               <FileText className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
               <p className="text-muted-foreground">You haven't submitted any proposals yet.</p>
               <Link href="/projects">
-                <Button size="sm" className="mt-4 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-full">
+                <Button size="sm" className="mt-4 cursor-pointer bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-full">
                   Browse Projects
                 </Button>
               </Link>
             </motion.div>
+          ) : filtered.length === 0 ? (
+            <motion.div variants={item} className="text-center py-16">
+              <p className="text-muted-foreground text-sm">No {filterStatus.toLowerCase()} proposals.</p>
+            </motion.div>
           ) : (
             <motion.div variants={container} initial="hidden" animate="show" className="flex flex-col gap-4">
-              {proposals.map((proposal) => (
+              {filtered.map((proposal) => (
                 <motion.div key={proposal.id} variants={item} layout>
-                  <Card className="bg-card border-border/60 hover:border-amber-500/20 transition-colors duration-300">
+                  <Card className={`bg-card border-border/60 transition-colors duration-300 ${
+                    proposal.status === "ACCEPTED"
+                      ? "hover:border-emerald-500/30"
+                      : proposal.status === "REJECTED"
+                      ? "hover:border-red-500/20 opacity-75"
+                      : "hover:border-amber-500/20"
+                  }`}>
                     <CardContent className="p-5 flex flex-col gap-4">
                       {/* Top row */}
                       <div className="flex items-start justify-between gap-4">
@@ -173,15 +252,18 @@ export default function MyProposalsPage() {
                               {proposal.project.client.name?.charAt(0)}
                             </AvatarFallback>
                           </Avatar>
-                          <div className="flex flex-col gap-0.5 min-w-0">
-                            <Link href={`/projects/${proposal.project.id}`}>
-                              <h3
-                                className="font-semibold text-base hover:text-amber-400 transition-colors cursor-pointer leading-tight"
-                                style={{ fontFamily: "'Playfair Display', serif" }}
-                              >
-                                {proposal.project.title}
-                              </h3>
-                            </Link>
+                          <div className="flex flex-col gap-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Link href={`/projects/${proposal.project.id}`}>
+                                <h3
+                                  className="font-semibold text-base hover:text-amber-400 transition-colors cursor-pointer leading-tight"
+                                  style={{ fontFamily: "'Playfair Display', serif" }}
+                                >
+                                  {proposal.project.title}
+                                </h3>
+                              </Link>
+                              <StatusBadge status={proposal.status} />
+                            </div>
                             <p className="text-xs text-muted-foreground">
                               by {proposal.project.client.name} ·{" "}
                               <Badge variant="outline" className="text-xs border-border text-muted-foreground py-0 px-1.5">
@@ -192,25 +274,35 @@ export default function MyProposalsPage() {
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <Link href={`/projects/${proposal.project.id}`}>
-                            <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-amber-400 h-8 px-2">
+                            <Button size="sm" variant="ghost" className="text-muted-foreground cursor-pointer hover:text-amber-400 h-8 px-2">
                               <ArrowRight className="w-4 h-4" />
                             </Button>
                           </Link>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleWithdraw(proposal.id)}
-                            disabled={deletingId === proposal.id}
-                            className="text-muted-foreground hover:text-red-400 h-8 px-2 transition-colors"
-                          >
-                            {deletingId === proposal.id ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="w-4 h-4" />
-                            )}
-                          </Button>
+                          {proposal.status === "PENDING" && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleWithdraw(proposal.id)}
+                              disabled={deletingId === proposal.id}
+                              className="text-muted-foreground cursor-pointer hover:text-red-400 h-8 px-2 transition-colors"
+                            >
+                              {deletingId === proposal.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-4 h-4" />
+                              )}
+                            </Button>
+                          )}
                         </div>
                       </div>
+
+                      {/* Accepted banner */}
+                      {proposal.status === "ACCEPTED" && (
+                        <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2">
+                          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                          Your proposal was accepted! The client will be in touch shortly.
+                        </div>
+                      )}
 
                       {/* Meta row */}
                       <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
@@ -235,7 +327,7 @@ export default function MyProposalsPage() {
                       <div>
                         <button
                           onClick={() => setExpandedId(expandedId === proposal.id ? null : proposal.id)}
-                          className="text-xs text-amber-400/70 hover:text-amber-400 transition-colors"
+                          className="text-xs text-amber-400/70 cursor-pointer hover:text-amber-400 transition-colors"
                         >
                           {expandedId === proposal.id ? "Hide cover letter ↑" : "View cover letter ↓"}
                         </button>
