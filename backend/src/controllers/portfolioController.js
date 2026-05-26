@@ -49,24 +49,6 @@ exports.createPortfolio = async (req, res) => {
   }
 }
 
-// DELETE /api/portfolio/:id
-exports.deletePortfolio = async (req, res) => {
-  try {
-    const clerkId = req.auth.sub
-    const user = await prisma.user.findUnique({ where: { clerkId } })
-    const { id } = req.params
-
-    const item = await prisma.portfolio.findUnique({ where: { id } })
-    if (!item) return res.status(404).json({ error: 'Portfolio item not found' })
-    if (item.userId !== user.id) return res.status(403).json({ error: 'Forbidden' })
-
-    await prisma.portfolio.delete({ where: { id } })
-    res.status(200).json({ message: 'Portfolio item deleted' })
-  } catch (error) {
-    res.status(500).json({ error: error.message })
-  }
-}
-
 // PATCH /api/portfolio/:id
 exports.updatePortfolio = async (req, res) => {
   try {
@@ -82,10 +64,35 @@ exports.updatePortfolio = async (req, res) => {
 
     const updated = await prisma.portfolio.update({
       where: { id },
-      data: { title, description, image, githubUrl, liveUrl, techStack },
+      data: {
+        ...(title !== undefined && { title }),
+        ...(description !== undefined && { description }),
+        ...(image !== undefined && { image }),
+        ...(githubUrl !== undefined && { githubUrl }),
+        ...(liveUrl !== undefined && { liveUrl }),
+        ...(techStack !== undefined && { techStack }),
+      },
     })
 
     res.status(200).json(updated)
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+}
+
+// DELETE /api/portfolio/:id
+exports.deletePortfolio = async (req, res) => {
+  try {
+    const clerkId = req.auth.sub
+    const user = await prisma.user.findUnique({ where: { clerkId } })
+    const { id } = req.params
+
+    const item = await prisma.portfolio.findUnique({ where: { id } })
+    if (!item) return res.status(404).json({ error: 'Portfolio item not found' })
+    if (item.userId !== user.id) return res.status(403).json({ error: 'Forbidden' })
+
+    await prisma.portfolio.delete({ where: { id } })
+    res.status(200).json({ message: 'Portfolio item deleted' })
   } catch (error) {
     res.status(500).json({ error: error.message })
   }

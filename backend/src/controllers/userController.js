@@ -62,16 +62,10 @@ exports.getDashboardStats = async (req, res) => {
 
     if (!user) return res.status(404).json({ error: 'User not found' })
 
-    // Active projects (posted by this user as client)
     const activeProjects = user.projects.length
-
-    // Proposals sent (as freelancer)
     const proposalsSent = user.proposals.length
-
-    // Portfolio items count
     const portfolioItems = user.portfolios.length
 
-    // Recent proposals on user's projects (as client)
     const recentProposals = await prisma.proposal.findMany({
       where: {
         project: { clientId: user.id },
@@ -84,7 +78,6 @@ exports.getDashboardStats = async (req, res) => {
       take: 5,
     })
 
-    // Recent projects
     const recentProjects = await prisma.project.findMany({
       where: { clientId: user.id },
       include: { proposals: true },
@@ -105,11 +98,65 @@ exports.getDashboardStats = async (req, res) => {
         activeProjects,
         proposalsSent,
         portfolioItems,
-        profileViews: 0, // placeholder — can add view tracking later
+        profileViews: 0,
       },
       recentProposals,
       recentProjects,
     })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+}
+
+// GET /api/users/profile
+exports.getProfile = async (req, res) => {
+  try {
+    const clerkId = req.auth.sub
+    const user = await prisma.user.findUnique({
+      where: { clerkId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        image: true,
+        role: true,
+        bio: true,
+        hourlyRate: true,
+        availability: true,
+        skills: true,
+      },
+    })
+    if (!user) return res.status(404).json({ error: 'User not found' })
+    res.status(200).json(user)
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+}
+
+// PATCH /api/users/profile
+exports.updateProfile = async (req, res) => {
+  try {
+    const clerkId = req.auth.sub
+    const { bio, hourlyRate, availability, skills } = req.body
+
+    const user = await prisma.user.update({
+      where: { clerkId },
+      data: {
+        ...(bio !== undefined && { bio }),
+        ...(hourlyRate !== undefined && { hourlyRate: hourlyRate ? parseInt(hourlyRate) : null }),
+        ...(availability !== undefined && { availability }),
+        ...(skills !== undefined && { skills }),
+      },
+      select: {
+        id: true,
+        bio: true,
+        hourlyRate: true,
+        availability: true,
+        skills: true,
+      },
+    })
+
+    res.status(200).json(user)
   } catch (error) {
     res.status(500).json({ error: error.message })
   }

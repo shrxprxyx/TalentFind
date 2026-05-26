@@ -13,16 +13,13 @@ exports.createProposal = async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' })
     }
 
-    // Check project exists
     const project = await prisma.project.findUnique({ where: { id: projectId } })
     if (!project) return res.status(404).json({ error: 'Project not found' })
 
-    // Prevent client from proposing on own project
     if (project.clientId === user.id) {
       return res.status(400).json({ error: 'Cannot propose on your own project' })
     }
 
-    // Prevent duplicate proposals
     const existing = await prisma.proposal.findFirst({
       where: { projectId, freelancerId: user.id },
     })
@@ -85,8 +82,45 @@ exports.deleteProposal = async (req, res) => {
     if (!proposal) return res.status(404).json({ error: 'Proposal not found' })
     if (proposal.freelancerId !== user.id) return res.status(403).json({ error: 'Forbidden' })
 
+    // Only allow withdrawing PENDING proposals
+    if (proposal.status !== 'PENDING') {
+      return res.status(400).json({ error: 'Cannot withdraw an accepted or rejected proposal' })
+    }
+
     await prisma.proposal.delete({ where: { id } })
     res.status(200).json({ message: 'Proposal withdrawn' })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+}
+
+// PATCH /api/proposals/:id/accept — client accepts a proposal
+exports.acceptProposal = async (req, res) => {
+  try {
+    const clerkId = req.auth.sub
+    const user = await prisma.user.findUnique({ where: { clerkId } })
+    const { id } = req.params
+
+    const proposal = await prisma.proposal.findUnique({
+      where: { id },
+      include: { project: true },
+    })
+
+    if (!proposal) return res.status(404).json({ error: 'Proposal not found' })
+    if (proposal.project.clientId !== user.id) return res.status(403).json({ error: 'Forbidden' })
+
+    const updated = await prisma.proposal.update({
+      where: { id },
+      data: { status: 'ACCEPTED' },
+    })
+
+    // Reject all other proposals on the same project
+    await prisma.proposal.updateMany({
+      where: { projectId: proposal.projectId, id: { not: id } },
+      data: { status: 'REJECTED' },
+    })
+
+    res.status(200).json(updated)
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
