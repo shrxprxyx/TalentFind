@@ -161,8 +161,8 @@ export default function DashboardClient({ userName, userImage, userEmail }: Prop
               className="text-5xl font-bold mt-1"
               style={{ fontFamily: "'Playfair Display', serif" }}
             >
-              Welcome back,{" "}
-              <span className="italic text-amber-400">{firstName}.</span>
+              Welcome back{" "}
+              {/* <span className="italic text-amber-400">{firstName}</span> */}
             </h1>
             <p className="text-muted-foreground">
               Here's what's happening on your stage today.

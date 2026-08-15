@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { motion, Variants, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -11,65 +11,55 @@ import axios from "axios";
 import {
   Plus,
   Loader2,
-  Trash2,
   ExternalLink,
-  ImageIcon,
+  Trash2,
   X,
   FolderOpen,
-  AlertCircle,
-  Globe,
-  Tag,
-  FileText,
+  Image as ImageIcon,
 } from "lucide-react";
 
 interface PortfolioItem {
   id: string;
   title: string;
   description: string;
-  imageUrl?: string;
-  link?: string;
-  tags: string[];
-  category: string;
+  image: string | null;
+  githubUrl: string | null;
+  liveUrl: string | null;
+  techStack: string[];
   createdAt: string;
 }
 
-const CATEGORIES = ["Web Dev", "Mobile", "Design", "Writing", "Video", "Other"];
-
-const item: Variants = {
-  hidden: { opacity: 0, y: 16 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] as const } },
+const emptyForm = {
+  title: "",
+  description: "",
+  image: "",
+  githubUrl: "",
+  liveUrl: "",
+  techStack: [] as string[],
 };
 
-const cardVariant: Variants = {
-  hidden: { opacity: 0, scale: 0.97 },
-  show: { opacity: 1, scale: 1, transition: { duration: 0.35, ease: [0.22, 1, 0.36, 1] as const } },
+const item: Variants = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as const } },
 };
 
 export default function PortfolioPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const [items, setItems] = useState<PortfolioItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  const [form, setForm] = useState(emptyForm);
+  const [techInput, setTechInput] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [tagInput, setTagInput] = useState("");
 
-  const [form, setForm] = useState({
-    title: "",
-    description: "",
-    imageUrl: "",
-    link: "",
-    category: "Web Dev",
-    tags: [] as string[],
-  });
-
-  const fetchItems = async () => {
+  const fetchPortfolio = async () => {
     try {
       setLoading(true);
       const token = await getToken();
       const res = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/portfolio`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/portfolio/my`,
         { headers: { Authorization: token! } }
       );
       setItems(res.data);
@@ -82,335 +72,242 @@ export default function PortfolioPage() {
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
-    fetchItems();
+    fetchPortfolio();
   }, [isLoaded, isSignedIn]);
 
-  const resetForm = () => {
-    setForm({ title: "", description: "", imageUrl: "", link: "", category: "Web Dev", tags: [] });
-    setTagInput("");
-    setShowForm(false);
-  };
-
-  const addTag = () => {
-    const t = tagInput.trim();
-    if (t && !form.tags.includes(t)) {
-      setForm({ ...form, tags: [...form.tags, t] });
-      setTagInput("");
+  const addTech = () => {
+    const t = techInput.trim();
+    if (t && !form.techStack.includes(t)) {
+      setForm({ ...form, techStack: [...form.techStack, t] });
+      setTechInput("");
     }
   };
 
-  const removeTag = (tag: string) => setForm({ ...form, tags: form.tags.filter((t) => t !== tag) });
+  const removeTech = (tech: string) => {
+    setForm({ ...form, techStack: form.techStack.filter((t) => t !== tech) });
+  };
 
-  const handleSubmit = async () => {
+  const saveItem = async () => {
     if (!form.title || !form.description) {
-      setError("Title and description are required.");
+      setError("Title and description required.");
       return;
     }
     try {
-      setSubmitting(true);
+      setSaving(true);
       setError("");
       const token = await getToken();
-      const res = await axios.post(
+      await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/api/portfolio`,
         form,
         { headers: { Authorization: token! } }
       );
-      setItems([res.data, ...items]);
-      resetForm();
+      setForm(emptyForm);
+      setShowForm(false);
+      await fetchPortfolio();
     } catch (err: any) {
-      setError(err?.response?.data?.error || "Failed to add item.");
+      setError(err?.response?.data?.error || "Failed to save.");
     } finally {
-      setSubmitting(false);
+      setSaving(false);
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const deleteItem = async (id: string) => {
     try {
       setDeletingId(id);
       const token = await getToken();
-      await axios.delete(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/portfolio/${id}`,
-        { headers: { Authorization: token! } }
-      );
-      setItems(items.filter((i) => i.id !== id));
+      await axios.delete(`${process.env.NEXT_PUBLIC_API_URL}/api/portfolio/${id}`, {
+        headers: { Authorization: token! },
+      });
+      await fetchPortfolio();
     } catch {
-      setError("Failed to delete item.");
+      setError("Failed to delete.");
     } finally {
       setDeletingId(null);
     }
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen">
+        <Navbar />
+        <div className="flex items-center justify-center py-40">
+          <Loader2 className="w-6 h-6 text-amber-400 animate-spin" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen">
       <Navbar />
-      <main className="max-w-5xl mx-auto px-6 py-12">
+      <main className="max-w-6xl mx-auto px-6 py-12">
         <motion.div
           initial="hidden"
           animate="show"
           variants={{ show: { transition: { staggerChildren: 0.08 } } }}
           className="flex flex-col gap-8"
         >
-          {/* Header */}
-          <motion.div variants={item} className="flex items-start justify-between gap-4">
-            <div className="flex flex-col gap-2">
-              <h1 className="text-4xl font-bold" style={{ fontFamily: "'Playfair Display', serif" }}>
+          <motion.div variants={item} className="flex items-center justify-between">
+            <div>
+              <h1
+                className="text-4xl font-bold"
+                style={{ fontFamily: "'Playfair Display', serif" }}
+              >
                 My <span className="italic text-amber-400">Portfolio</span>
               </h1>
-              <p className="text-muted-foreground">Showcase your best work to attract clients.</p>
+              <p className="text-sm text-muted-foreground mt-2">
+                Showcase your best work to attract clients.
+              </p>
             </div>
             <Button
               onClick={() => setShowForm(!showForm)}
-              className="bg-amber-500 hover:bg-amber-400 cursor-pointer text-slate-950 font-semibold rounded-full px-5 shrink-0"
+              className="bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-full px-6 font-semibold"
             >
-              <Plus className="w-4 h-4 mr-1.5" /> Add Project
+              <Plus className="w-4 h-4 mr-2" /> Add Project
             </Button>
           </motion.div>
 
           {error && (
-            <motion.div variants={item} className="flex items-center gap-2 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">
-              <AlertCircle className="w-4 h-4 shrink-0" /> {error}
-              <button onClick={() => setError("")} className="ml-auto cursor-pointer hover:text-red-300"><X className="w-3.5 h-3.5" /></button>
+            <motion.div variants={item} className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg p-4">
+              {error}
             </motion.div>
           )}
 
-          {/* Add form */}
           <AnimatePresence>
             {showForm && (
               <motion.div
-                initial={{ opacity: 0, y: -12 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -12 }}
-                transition={{ duration: 0.3 }}
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="bg-card border border-amber-500/20 rounded-xl p-6"
               >
-                <Card className="bg-card border-amber-500/20">
-                  <CardContent className="p-6 flex flex-col gap-5">
-                    <div className="flex items-center justify-between">
-                      <h2 className="font-semibold text-base" style={{ fontFamily: "'Playfair Display', serif" }}>
-                        New Portfolio Item
-                      </h2>
-                      <button onClick={resetForm} className="text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold" style={{ fontFamily: "'Playfair Display', serif" }}>
+                    Add Portfolio Item
+                  </h3>
+                  <button onClick={() => setShowForm(false)}>
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
 
-                    {/* Title */}
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-sm font-medium">Title <span className="text-red-400">*</span></label>
-                      <input
-                        className="bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-amber-500/50 transition-colors"
-                        placeholder="e.g. E-commerce Dashboard"
-                        value={form.title}
-                        onChange={(e) => setForm({ ...form, title: e.target.value })}
-                      />
-                    </div>
-
-                    {/* Description */}
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-sm font-medium">Description <span className="text-red-400">*</span></label>
-                      <textarea
-                        rows={3}
-                        className="bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-amber-500/50 transition-colors resize-none"
-                        placeholder="What did you build? What was the impact?"
-                        value={form.description}
-                        onChange={(e) => setForm({ ...form, description: e.target.value })}
-                      />
-                    </div>
-
-                    {/* Image URL + Link */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-sm font-medium flex items-center gap-1.5">
-                          <ImageIcon className="w-3.5 h-3.5 text-muted-foreground" /> Image URL
-                        </label>
-                        <input
-                          className="bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-amber-500/50 transition-colors"
-                          placeholder="https://..."
-                          value={form.imageUrl}
-                          onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-sm font-medium flex items-center gap-1.5">
-                          <Globe className="w-3.5 h-3.5 text-muted-foreground" /> Live Link
-                        </label>
-                        <input
-                          className="bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-amber-500/50 transition-colors"
-                          placeholder="https://..."
-                          value={form.link}
-                          onChange={(e) => setForm({ ...form, link: e.target.value })}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Category */}
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-sm font-medium">Category</label>
-                      <div className="flex flex-wrap gap-2">
-                        {CATEGORIES.map((cat) => (
-                          <button
-                            key={cat}
-                            onClick={() => setForm({ ...form, category: cat })}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all duration-200 cursor-pointer ${
-                              form.category === cat
-                                ? "bg-amber-500/10 border-amber-500/50 text-amber-400"
-                                : "border-border text-muted-foreground hover:border-amber-500/30"
-                            }`}
-                          >
-                            {cat}
+                <div className="flex flex-col gap-4">
+                  <input
+                    type="text"
+                    placeholder="Project title"
+                    className="bg-secondary border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-500/50"
+                    value={form.title}
+                    onChange={(e) => setForm({ ...form, title: e.target.value })}
+                  />
+                  <textarea
+                    placeholder="Description"
+                    rows={3}
+                    className="bg-secondary border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-500/50 resize-none"
+                    value={form.description}
+                    onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  />
+                  <input
+                    type="url"
+                    placeholder="Image URL"
+                    className="bg-secondary border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-500/50"
+                    value={form.image || ""}
+                    onChange={(e) => setForm({ ...form, image: e.target.value })}
+                  />
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      type="url"
+                      placeholder="GitHub URL"
+                      className="bg-secondary border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-500/50"
+                      value={form.githubUrl || ""}
+                      onChange={(e) => setForm({ ...form, githubUrl: e.target.value })}
+                    />
+                    <input
+                      type="url"
+                      placeholder="Live URL"
+                      className="bg-secondary border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-500/50"
+                      value={form.liveUrl || ""}
+                      onChange={(e) => setForm({ ...form, liveUrl: e.target.value })}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Add tech (React, TypeScript, etc.)"
+                      className="bg-secondary border border-border rounded-lg px-3 py-2 text-sm flex-1 focus:outline-none focus:border-amber-500/50"
+                      value={techInput}
+                      onChange={(e) => setTechInput(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTech())}
+                    />
+                    <Button size="sm" onClick={addTech} variant="outline" className="border-border">
+                      Add
+                    </Button>
+                  </div>
+                  {form.techStack.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {form.techStack.map((t) => (
+                        <Badge key={t} className="bg-amber-500/10 text-amber-400 border-amber-500/20">
+                          {t}
+                          <button onClick={() => removeTech(t)} className="ml-1 text-amber-300 hover:text-amber-200">
+                            ×
                           </button>
-                        ))}
-                      </div>
+                        </Badge>
+                      ))}
                     </div>
-
-                    {/* Tags */}
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-sm font-medium flex items-center gap-1.5">
-                        <Tag className="w-3.5 h-3.5 text-muted-foreground" /> Tech / Tools
-                      </label>
-                      <div className="flex gap-2">
-                        <input
-                          className="flex-1 bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-amber-500/50 transition-colors"
-                          placeholder="e.g. React, Figma"
-                          value={tagInput}
-                          onChange={(e) => setTagInput(e.target.value)}
-                          onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTag())}
-                        />
-                        <Button size="sm" variant="outline" onClick={addTag} className="border-border cursor-pointer hover:border-amber-500/40 hover:text-amber-400">
-                          <Plus className="w-4 h-4" />
-                        </Button>
-                      </div>
-                      {form.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mt-1">
-                          {form.tags.map((t) => (
-                            <Badge key={t} variant="outline" className="border-amber-500/30 text-amber-400 bg-amber-500/5 gap-1 pr-1">
-                              {t}
-                              <button onClick={() => removeTag(t)} className="hover:text-red-400 cursor-pointer transition-colors">
-                                <X className="w-3 h-3" />
-                              </button>
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex justify-end gap-3 pt-1">
-                      <Button variant="ghost" onClick={resetForm} className="text-muted-foreground cursor-pointer hover:text-foreground">
-                        Cancel
-                      </Button>
-                      <Button
-                        onClick={handleSubmit}
-                        disabled={submitting}
-                        className="bg-amber-500 hover:bg-amber-400 cursor-pointer text-slate-950 font-semibold rounded-full px-6"
-                      >
-                        {submitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</> : "Add to Portfolio"}
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                  )}
+                  <Button
+                    onClick={saveItem}
+                    disabled={saving}
+                    className="bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg font-semibold self-end"
+                  >
+                    {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</> : "Save Item"}
+                  </Button>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* Grid */}
-          {loading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="w-6 h-6 text-amber-400 animate-spin" />
-            </div>
-          ) : items.length === 0 ? (
-            <motion.div variants={item} className="text-center py-20">
-              <FolderOpen className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
+          {items.length === 0 ? (
+            <motion.div variants={item} className="flex flex-col items-center justify-center py-20">
+              <FolderOpen className="w-12 h-12 text-muted-foreground mb-4" />
               <p className="text-muted-foreground">Your portfolio is empty.</p>
-              <p className="text-sm text-muted-foreground/60 mt-1">Add your best work to stand out to clients.</p>
-              <Button
-                size="sm"
-                className="mt-4 bg-amber-500 cursor-pointer hover:bg-amber-400 text-slate-950 rounded-full"
-                onClick={() => setShowForm(true)}
-              >
-                Add your first project
-              </Button>
+              <p className="text-sm text-muted-foreground">Add your best work to stand out to clients.</p>
             </motion.div>
           ) : (
-            <motion.div
-              variants={{ show: { transition: { staggerChildren: 0.06 } } }}
-              initial="hidden"
-              animate="show"
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"
-            >
-              {items.map((portfolioItem) => (
-                <motion.div key={portfolioItem.id} variants={cardVariant}>
-                  <Card className="bg-card border-border/60 hover:border-amber-500/25 transition-all duration-300 hover:shadow-[0_0_20px_hsla(40,85%,58%,0.06)] group h-full flex flex-col overflow-hidden">
-                    {/* Image */}
-                    <div className="relative w-full aspect-video bg-secondary overflow-hidden">
-                      {portfolioItem.imageUrl ? (
-                        <img
-                          src={portfolioItem.imageUrl}
-                          alt={portfolioItem.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = "none";
-                          }}
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <FileText className="w-8 h-8 text-muted-foreground/20" />
+            <motion.div variants={{ show: { transition: { staggerChildren: 0.05 } } }} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {items.map((item) => (
+                <motion.div key={item.id}>
+                  <Card className="bg-card border-border/60 overflow-hidden hover:border-amber-500/25 transition-all duration-300">
+                    {item.image && <img src={item.image} alt={item.title} className="w-full h-40 object-cover" />}
+                    <CardContent className="p-4">
+                      <h3 className="font-semibold mb-1">{item.title}</h3>
+                      <p className="text-xs text-muted-foreground line-clamp-2 mb-3">{item.description}</p>
+                      {item.techStack.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mb-3">
+                          {item.techStack.slice(0, 3).map((t) => (
+                            <Badge key={t} variant="outline" className="text-xs border-amber-500/20 text-amber-400/70">
+                              {t}
+                            </Badge>
+                          ))}
+                          {item.techStack.length > 3 && (
+                            <Badge variant="outline" className="text-xs border-border text-muted-foreground">
+                              +{item.techStack.length - 3}
+                            </Badge>
+                          )}
                         </div>
                       )}
-                      {/* Category pill */}
-                      <span className="absolute top-2.5 left-2.5 text-xs font-medium px-2 py-0.5 rounded-full bg-black/60 text-white/80 backdrop-blur-sm">
-                        {portfolioItem.category}
-                      </span>
-                      {/* Actions overlay */}
-                      <div className="absolute top-2.5 right-2.5 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                        {portfolioItem.link && (
-                          <a
-                            href={portfolioItem.link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="w-7 h-7 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center text-white/80 hover:text-amber-400 transition-colors"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5" />
+                      <div className="flex gap-2">
+                        {item.liveUrl && (
+                          <a href={item.liveUrl} target="_blank" className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1">
+                            <ExternalLink className="w-3 h-3" /> Live
                           </a>
                         )}
                         <button
-                          onClick={() => handleDelete(portfolioItem.id)}
-                          disabled={deletingId === portfolioItem.id}
-                          className="w-7 h-7 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center text-white/80 hover:text-red-400 transition-colors cursor-pointer"
+                          onClick={() => deleteItem(item.id)}
+                          disabled={deletingId === item.id}
+                          className="ml-auto text-xs text-red-400 hover:text-red-300"
                         >
-                          {deletingId === portfolioItem.id ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-3.5 h-3.5" />
-                          )}
+                          {deletingId === item.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
                         </button>
                       </div>
-                    </div>
-
-                    <CardContent className="p-4 flex flex-col gap-2.5 flex-1">
-                      <h3
-                        className="font-semibold text-sm leading-snug group-hover:text-amber-400 transition-colors"
-                        style={{ fontFamily: "'Playfair Display', serif" }}
-                      >
-                        {portfolioItem.title}
-                      </h3>
-                      <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-                        {portfolioItem.description}
-                      </p>
-                      {portfolioItem.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-auto pt-1">
-                          {portfolioItem.tags.slice(0, 4).map((tag) => (
-                            <Badge
-                              key={tag}
-                              variant="outline"
-                              className="text-xs border-amber-500/20 text-amber-400/70 bg-amber-500/5 px-1.5 py-0"
-                            >
-                              {tag}
-                            </Badge>
-                          ))}
-                          {portfolioItem.tags.length > 4 && (
-                            <span className="text-xs text-muted-foreground">+{portfolioItem.tags.length - 4}</span>
-                          )}
-                        </div>
-                      )}
                     </CardContent>
                   </Card>
                 </motion.div>
