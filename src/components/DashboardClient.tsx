@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { motion, Variants } from "framer-motion";
 import { UserButton } from "@clerk/nextjs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -51,9 +52,9 @@ const allQuickActions = [
 ];
 
 const ROLES = [
-  { key: "FREELANCER", label: "Freelancer"},
-  { key: "CLIENT", label: "Client"},
-  { key: "BOTH", label: "Both"},
+  { key: "FREELANCER", label: "Freelancer" },
+  { key: "CLIENT", label: "Client" },
+  { key: "BOTH", label: "Both" },
 ] as const;
 
 function StatCard({
@@ -94,6 +95,8 @@ function StatCard({
 export default function DashboardClient({ userName, userImage, userEmail }: Props) {
   const firstName = userName.split(" ")[0];
   const { data, loading, error, updateRole } = useDashboard();
+  const [showRoleChange, setShowRoleChange] = useState(false);
+  const [changingRole, setChangingRole] = useState(false);
 
   const role = data?.user?.role;
   const stats = data?.stats;
@@ -103,6 +106,13 @@ export default function DashboardClient({ userName, userImage, userEmail }: Prop
   const quickActions = role
     ? allQuickActions.filter((a) => a.roles.includes(role))
     : allQuickActions.filter((a) => a.roles.includes("FREELANCER"));
+
+  const handleRoleChange = async (newRole: "FREELANCER" | "CLIENT" | "BOTH") => {
+    setChangingRole(true);
+    await updateRole(newRole);
+    setChangingRole(false);
+    setShowRoleChange(false);
+  };
 
   return (
     <div className="min-h-screen relative">
@@ -161,8 +171,7 @@ export default function DashboardClient({ userName, userImage, userEmail }: Prop
               className="text-5xl font-bold mt-1"
               style={{ fontFamily: "'Playfair Display', serif" }}
             >
-              Welcome back{" "}
-              {/* <span className="italic text-amber-400">{firstName}</span> */}
+              Welcome back
             </h1>
             <p className="text-muted-foreground">
               Here's what's happening on your stage today.
@@ -187,13 +196,14 @@ export default function DashboardClient({ userName, userImage, userEmail }: Prop
                     Tell us how you'll use TalentStage so we can personalise your experience.
                   </p>
                   <div className="grid grid-cols-3 gap-3">
-                    {ROLES.map(({ key, label}) => (
+                    {ROLES.map(({ key, label }) => (
                       <button
                         key={key}
-                        onClick={() => updateRole(key)}
-                        className="group flex flex-col cursor-pointer items-start gap-1 p-4 rounded-xl border border-border hover:border-amber-500/50 hover:bg-amber-500/5 transition-all duration-200 text-left"
+                        onClick={() => handleRoleChange(key)}
+                        disabled={changingRole}
+                        className="group flex flex-col cursor-pointer items-start gap-1 p-4 rounded-xl border border-border hover:border-amber-500/50 hover:bg-amber-500/5 transition-all duration-200 text-left disabled:opacity-50"
                       >
-                        <span className="font-semibold  text-sm group-hover:text-amber-400 transition-colors">
+                        <span className="font-semibold text-sm group-hover:text-amber-400 transition-colors">
                           {label}
                         </span>
                       </button>
@@ -204,20 +214,51 @@ export default function DashboardClient({ userName, userImage, userEmail }: Prop
             </motion.div>
           )}
 
-          {/* Role set confirmation */}
+          {/* Role set confirmation + inline change picker */}
           {!loading && role && (
-            <motion.div variants={item}>
+            <motion.div variants={item} className="flex flex-col gap-3">
               <div className="flex items-center gap-2 text-sm text-amber-400/80">
                 <CheckCircle2 className="w-4 h-4" />
                 You're set up as a{" "}
-                <span className="font-semibold capitalize">{role.toLowerCase()}</span>.
+                <span className="font-semibold text-amber-400">{role.charAt(0) + role.slice(1).toLowerCase()}</span>
+                {" · "}
                 <button
-                  onClick={() => {/* open role change UI */}}
-                  className="text-muted-foreground cursor-pointer hover:text-amber-400 underline underline-offset-2 ml-1 transition-colors"
+                  onClick={() => setShowRoleChange(!showRoleChange)}
+                  className="text-muted-foreground cursor-pointer hover:text-amber-400 underline underline-offset-2 transition-colors"
                 >
-                  Change
+                  {showRoleChange ? "Cancel" : "Change"}
                 </button>
               </div>
+
+              {/* Inline role picker */}
+              {showRoleChange && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex gap-2 flex-wrap"
+                >
+                  {ROLES.map(({ key, label }) => (
+                    <button
+                      key={key}
+                      onClick={() => handleRoleChange(key)}
+                      disabled={changingRole || role === key}
+                      className={`flex items-center gap-1.5 px-4 py-2 rounded-xl border text-sm font-medium transition-all duration-200 cursor-pointer disabled:cursor-not-allowed ${
+                        role === key
+                          ? "bg-amber-500/10 border-amber-500/50 text-amber-400"
+                          : "border-border text-muted-foreground hover:border-amber-500/40 hover:text-amber-400 hover:bg-amber-500/5"
+                      }`}
+                    >
+                      {changingRole && role !== key ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : null}
+                      {label}
+                      {role === key && <CheckCircle2 className="w-3.5 h-3.5 ml-1" />}
+                    </button>
+                  ))}
+                </motion.div>
+              )}
             </motion.div>
           )}
 
