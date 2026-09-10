@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
-import { motion, Variants } from "framer-motion";
+import { motion, Variants, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +14,7 @@ import axios from "axios";
 import {
   ArrowLeft, Clock, DollarSign, Users, Calendar,
   Loader2, Send, X, CheckCircle2, Check,
+  Sparkles, Trophy, AlertCircle, ChevronDown, ChevronUp,
 } from "lucide-react";
 import Link from "next/link";
 import { formatDistanceToNow, format } from "date-fns";
@@ -42,6 +43,16 @@ interface Project {
   proposals: Proposal[];
 }
 
+interface EvalResult {
+  proposalId: string;
+  freelancerName: string;
+  rank: number;
+  score: number;
+  verdict: string;
+  reasons: string[];
+  concern: string;
+}
+
 const fadeItem: Variants = {
   hidden: { opacity: 0, y: 16 },
   show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] as const } },
@@ -52,6 +63,16 @@ const statusColors: Record<string, string> = {
   ACCEPTED: "border-green-500/40 text-green-400 bg-green-500/5",
   REJECTED: "border-red-500/40 text-red-400 bg-red-500/5",
 };
+
+function ScoreRing({ score }: { score: number }) {
+  const color = score >= 75 ? "text-emerald-400" : score >= 50 ? "text-amber-400" : "text-red-400";
+  return (
+    <div className={`text-2xl font-bold ${color}`} style={{ fontFamily: "'Playfair Display', serif" }}>
+      {score}
+      <span className="text-xs text-muted-foreground font-normal">/100</span>
+    </div>
+  );
+}
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -68,15 +89,18 @@ export default function ProjectDetailPage() {
   const [proposalError, setProposalError] = useState("");
   const [proposal, setProposal] = useState({ bidAmount: "", timeline: "", coverLetter: "" });
 
+  // AI Evaluator state
+  const [evaluating, setEvaluating] = useState(false);
+  const [evalResults, setEvalResults] = useState<EvalResult[] | null>(null);
+  const [evalError, setEvalError] = useState("");
+  const [showEval, setShowEval] = useState(true);
+
   const fetchProject = async () => {
     try {
       const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/projects/${id}`);
       setProject(res.data);
     } catch (err: any) {
-      // Only redirect on 404, not on every error
-      if (err?.response?.status === 404) {
-        router.push("/projects");
-      }
+      if (err?.response?.status === 404) router.push("/projects");
     } finally {
       setLoading(false);
     }
@@ -127,12 +151,32 @@ export default function ProjectDetailPage() {
     }
   };
 
-  // Compute permissions after both loads complete
+  const runEvaluation = async () => {
+    try {
+      setEvaluating(true);
+      setEvalError("");
+      setEvalResults(null);
+      const token = await getToken();
+      const res = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/ai/evaluate-proposals`,
+        { projectId: id },
+        { headers: { Authorization: token! } }
+      );
+      setEvalResults(res.data.results);
+      setShowEval(true);
+    } catch (err: any) {
+      setEvalError(err?.response?.data?.error || "AI evaluation failed. Try again.");
+    } finally {
+      setEvaluating(false);
+    }
+  };
+
   const dashLoaded = !!dashData?.user?.id;
   const isProjectOwner = dashLoaded && project !== null && dashData!.user.id === project.clientId;
   const isClient = isProjectOwner;
   const isFreelancer = dashLoaded && !isProjectOwner;
   const hasAccepted = project?.proposals.some((p) => p.status === "ACCEPTED") ?? false;
+  const pendingProposals = project?.proposals.filter((p) => p.status === "PENDING") ?? [];
 
   if (loading) {
     return (
@@ -193,7 +237,6 @@ export default function ProjectDetailPage() {
                         {project.projectType}
                       </Badge>
                     </div>
-
                     <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                       <span className="flex items-center gap-1.5">
                         <DollarSign className="w-4 h-4 text-amber-400" />
@@ -212,11 +255,9 @@ export default function ProjectDetailPage() {
                         Posted {formatDistanceToNow(new Date(project.createdAt), { addSuffix: true })}
                       </span>
                     </div>
-
                     <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
                       {project.description}
                     </p>
-
                     {project.skills.length > 0 && (
                       <div className="flex flex-wrap gap-2">
                         {project.skills.map((s) => (
@@ -229,6 +270,140 @@ export default function ProjectDetailPage() {
                   </CardContent>
                 </Card>
               </motion.div>
+
+              {/* AI Proposal Evaluator — clients only, with proposals */}
+              {isClient && project.proposals.length > 0 && (
+                <motion.div variants={fadeItem}>
+                  <Card className="bg-card border-amber-500/20 overflow-hidden">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <CardTitle
+                          className="text-base flex items-center gap-2"
+                          style={{ fontFamily: "'Playfair Display', serif" }}
+                        >
+                          <Sparkles className="w-4 h-4 text-amber-400" />
+                          AI Proposal Evaluator
+                        </CardTitle>
+                        {evalResults && (
+                          <button
+                            onClick={() => setShowEval(!showEval)}
+                            className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+                          >
+                            {showEval ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                          </button>
+                        )}
+                      </div>
+                      {!evalResults && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Let AI rank and score all {project.proposals.length} proposal{project.proposals.length !== 1 ? "s" : ""} by relevance, bid value, and fit.
+                        </p>
+                      )}
+                    </CardHeader>
+                    <CardContent className="flex flex-col gap-4 pt-0">
+                      {evalError && (
+                        <div className="flex items-center gap-2 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {evalError}
+                        </div>
+                      )}
+
+                      {!evalResults ? (
+                        <Button
+                          onClick={runEvaluation}
+                          disabled={evaluating}
+                          className="bg-amber-500 hover:bg-amber-400 cursor-pointer text-slate-950 font-semibold rounded-full self-start px-6 transition-all duration-300 hover:shadow-[0_0_20px_hsla(40,85%,58%,0.35)]"
+                        >
+                          {evaluating ? (
+                            <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Evaluating proposals...</>
+                          ) : (
+                            <><Sparkles className="w-4 h-4 mr-2" /> Evaluate with AI</>
+                          )}
+                        </Button>
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs text-emerald-400 flex items-center gap-1.5">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Evaluation complete
+                          </p>
+                          <button
+                            onClick={runEvaluation}
+                            disabled={evaluating}
+                            className="text-xs text-muted-foreground cursor-pointer hover:text-amber-400 transition-colors"
+                          >
+                            {evaluating ? "Re-evaluating..." : "Re-evaluate ↺"}
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Results */}
+                      <AnimatePresence>
+                        {evalResults && showEval && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.3 }}
+                            className="overflow-hidden flex flex-col gap-3"
+                          >
+                            {evalResults
+                              .sort((a, b) => a.rank - b.rank)
+                              .map((result) => {
+                                const matchedProposal = project.proposals.find(p => p.id === result.proposalId);
+                                return (
+                                  <div
+                                    key={result.proposalId}
+                                    className={`flex flex-col gap-2.5 p-4 rounded-xl border transition-colors ${
+                                      result.rank === 1
+                                        ? "border-amber-500/30 bg-amber-500/5"
+                                        : "border-border/60 bg-secondary/30"
+                                    }`}
+                                  >
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div className="flex items-center gap-2.5">
+                                        {result.rank === 1 && (
+                                          <Trophy className="w-4 h-4 text-amber-400 shrink-0" />
+                                        )}
+                                        <div>
+                                          <div className="flex items-center gap-2 flex-wrap">
+                                            <p className="font-semibold text-sm">{result.freelancerName}</p>
+                                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                                              result.rank === 1
+                                                ? "bg-amber-500/15 text-amber-400"
+                                                : "bg-secondary text-muted-foreground"
+                                            }`}>
+                                              #{result.rank} · {result.verdict}
+                                            </span>
+                                          </div>
+                                          {matchedProposal && (
+                                            <p className="text-xs text-muted-foreground mt-0.5">
+                                              ${matchedProposal.bidAmount.toLocaleString()} · {matchedProposal.timeline}
+                                            </p>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <ScoreRing score={result.score} />
+                                    </div>
+
+                                    <div className="flex flex-col gap-1">
+                                      {result.reasons.map((r, i) => (
+                                        <p key={i} className="text-xs text-muted-foreground flex items-start gap-1.5">
+                                          <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0 mt-0.5" /> {r}
+                                        </p>
+                                      ))}
+                                      {result.concern && (
+                                        <p className="text-xs text-amber-400/70 flex items-start gap-1.5 mt-0.5">
+                                          <AlertCircle className="w-3 h-3 shrink-0 mt-0.5" /> {result.concern}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
 
               {/* Proposal form — freelancers only */}
               {isFreelancer && (
@@ -245,7 +420,7 @@ export default function ProjectDetailPage() {
                           <CardTitle className="text-base" style={{ fontFamily: "'Playfair Display', serif" }}>
                             Submit a Proposal
                           </CardTitle>
-                          <button onClick={() => setShowForm(false)} className="text-muted-foreground hover:text-foreground">
+                          <button onClick={() => setShowForm(false)} className="text-muted-foreground hover:text-foreground cursor-pointer">
                             <X className="w-4 h-4" />
                           </button>
                         </div>
@@ -290,7 +465,7 @@ export default function ProjectDetailPage() {
                         <Button
                           onClick={submitProposal}
                           disabled={submitting}
-                          className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold rounded-full self-end px-6"
+                          className="bg-amber-500 hover:bg-amber-400 cursor-pointer text-slate-950 font-semibold rounded-full self-end px-6"
                         >
                           {submitting
                             ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Submitting...</>
@@ -302,7 +477,7 @@ export default function ProjectDetailPage() {
                   ) : (
                     <Button
                       onClick={() => setShowForm(true)}
-                      className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold rounded-xl py-3 hover:shadow-[0_0_20px_hsla(40,85%,58%,0.35)] transition-all duration-300"
+                      className="w-full bg-amber-500 hover:bg-amber-400 cursor-pointer text-slate-950 font-semibold rounded-xl py-3 hover:shadow-[0_0_20px_hsla(40,85%,58%,0.35)] transition-all duration-300"
                     >
                       <Send className="w-4 h-4 mr-2" /> Submit a Proposal
                     </Button>
@@ -378,7 +553,7 @@ export default function ProjectDetailPage() {
                               size="sm"
                               onClick={() => acceptProposal(p.id)}
                               disabled={acceptingId === p.id}
-                              className="w-full bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/30 hover:border-green-500/50 rounded-lg text-xs font-medium transition-all duration-200"
+                              className="w-full bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/30 hover:border-green-500/50 rounded-lg text-xs font-medium transition-all duration-200 cursor-pointer"
                             >
                               {acceptingId === p.id
                                 ? <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" /> Accepting...</>
