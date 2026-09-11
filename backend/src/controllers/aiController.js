@@ -3,14 +3,10 @@ const Groq = require('groq-sdk')
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
-// Extracts the first JSON array or object found in the string
 const extractJSON = (raw) => {
-  // Strip think tags first
   let cleaned = raw.replace(/<think>[\s\S]*?<\/think>/gi, '').trim()
-  // Try to find JSON array
   const arrMatch = cleaned.match(/\[[\s\S]*\]/)
   if (arrMatch) return arrMatch[0]
-  // Try to find JSON object
   const objMatch = cleaned.match(/\{[\s\S]*\}/)
   if (objMatch) return objMatch[0]
   return cleaned
@@ -31,9 +27,7 @@ exports.evaluateProposals = async (req, res) => {
       include: {
         proposals: {
           include: {
-            freelancer: {
-              select: { name: true, bio: true },
-            },
+            freelancer: { select: { name: true, bio: true } },
           },
         },
       },
@@ -53,7 +47,7 @@ Proposal ${i + 1}:
 - Cover Letter: ${p.coverLetter}
 `).join('\n')
 
-    const prompt = `You are an expert hiring assistant. Evaluate these freelancer proposals and rank them.
+    const prompt = `You are an expert hiring assistant. Evaluate these freelancer proposals for the project below and rank them from best to worst.
 
 PROJECT:
 Title: ${project.title}
@@ -64,11 +58,19 @@ Required Skills: ${project.skills.join(', ')}
 PROPOSALS:
 ${proposalList}
 
-Respond with ONLY a raw JSON array, no preamble, no thinking, no markdown:
-[{"proposalId":"<id>","freelancerName":"<name>","rank":1,"score":85,"verdict":"Top pick","reasons":["reason1","reason2","reason3"],"concern":"any concern or empty string"}]`
+Return a JSON array where each element has these fields:
+- proposalId: string (the exact proposal ID from above)
+- freelancerName: string
+- rank: integer starting from 1 (1 = best)
+- score: integer from 0 to 100
+- verdict: short string like "Top pick" or "Strong candidate"
+- reasons: array of up to 3 short strings explaining why
+- concern: string with one concern, or empty string if none
+
+Output only the JSON array, nothing else.`
 
     const completion = await groq.chat.completions.create({
-      model: 'qwen/qwen3.6-27b',
+      model: 'openai/gpt-oss-20b',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.3,
       max_tokens: 900,
@@ -114,11 +116,11 @@ Freelancer ${i + 1}:
 - ID: ${f.id}
 - Name: ${f.name}
 - Bio: ${f.bio || 'Not provided'}
-- Portfolio: ${f.portfolios.map(p => p.title).join(', ') || 'None'}
-- Tech: ${f.portfolios.flatMap(p => p.techStack).join(', ') || 'None'}
+- Portfolio projects: ${f.portfolios.map(p => p.title).join(', ') || 'None'}
+- Tech used: ${f.portfolios.flatMap(p => p.techStack).join(', ') || 'None'}
 `).join('\n')
 
-    const prompt = `You are a freelancer matching expert. Find the top 5 matches for this project.
+    const prompt = `You are a freelancer matching expert. Find the best freelancers for this project.
 
 PROJECT:
 Title: ${project.title}
@@ -129,11 +131,17 @@ Required Skills: ${project.skills.join(', ')}
 FREELANCERS:
 ${freelancerList}
 
-Respond with ONLY a raw JSON array, no preamble, no thinking, no markdown:
-[{"freelancerId":"<id>","freelancerName":"<name>","matchScore":92,"matchReasons":["reason1","reason2"],"fitSummary":"one sentence summary"}]`
+Return a JSON array of the top 5 matches (or fewer if less than 5 exist). Each element must have:
+- freelancerId: string (exact ID from above)
+- freelancerName: string
+- matchScore: integer from 0 to 100
+- matchReasons: array of 2 short strings explaining the match
+- fitSummary: one sentence describing why they are a good fit
+
+Output only the JSON array, nothing else.`
 
     const completion = await groq.chat.completions.create({
-      model: 'qwen/qwen3.6-27b',
+      model: 'openai/gpt-oss-20b',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.3,
       max_tokens: 900,
@@ -168,7 +176,7 @@ Has Live URL: ${p.liveUrl ? 'Yes' : 'No'}
 Has GitHub: ${p.githubUrl ? 'Yes' : 'No'}
 `).join('\n')
 
-    const prompt = `You are a senior hiring manager reviewing a freelancer portfolio. Give specific feedback.
+    const prompt = `You are a senior hiring manager reviewing a freelancer portfolio. Give constructive feedback.
 
 FREELANCER: ${user.name}
 BIO: ${user.bio || 'Not provided'}
@@ -176,11 +184,18 @@ BIO: ${user.bio || 'Not provided'}
 PORTFOLIO:
 ${portfolioList}
 
-Respond with ONLY a raw JSON object, no preamble, no thinking, no markdown:
-{"overallScore":72,"overallVerdict":"Good foundation, needs polish","strengths":["strength1","strength2"],"improvements":[{"issue":"issue description","fix":"how to fix it"}],"missingItems":["item1","item2"],"tip":"one actionable tip"}`
+Return a JSON object with these fields:
+- overallScore: integer from 0 to 100
+- overallVerdict: short string summary
+- strengths: array of 2 strings describing what is good
+- improvements: array of objects, each with "issue" (string) and "fix" (string)
+- missingItems: array of strings describing what is missing
+- tip: one actionable string tip
+
+Output only the JSON object, nothing else.`
 
     const completion = await groq.chat.completions.create({
-      model: 'qwen/qwen3.6-27b',
+      model: 'openai/gpt-oss-20b',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.4,
       max_tokens: 900,
